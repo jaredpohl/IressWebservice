@@ -1,0 +1,24 @@
+user_name: jpohl
+password: password1
+company_name: HyperionPI
+service: IPS 
+server: IPSECPOHL
+period_range: 1 #how many months do you want the performance calculated for
+end_point: "http://127.0.0.1:51234/soap.aspx"
+name_space: "http://webservices.iress.com.au/v4/"
+precision: 6
+file_path: C:\Users\jared.pohl\Google Drive\ECPAM_IT\Automated Jobs\ECPAC IMA Performance\reports\
+db_path: C:\Users\jared.pohl\Google Drive\ECPAM_IT\Automated Jobs\ECPAC IMA Performance\reports\
+db_user: ECPOHL\administrator
+db_pass: Ecpohl2012
+db_server: ECPOHLSERVER\SBSMONITORING
+db_database: HyperionDB
+sendgrid_user: ecpam
+sendgrid_pass: "sg#!ecpoh1"
+ios_master_password: skf754hj
+portfolio_groups:
+#- IMA_NZ 
+- IMA_AUST 
+- L_EQUITIES 
+- PERF_MANDATE
+

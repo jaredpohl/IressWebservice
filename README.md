@@ -1,6 +1,8 @@
 # IressWebservice
 
-TODO: Write a gem description
+This gem is a wrapper that gives access to the user to basic connectivity to the IRESS Desktop Web Services Platform.
+
+there is still plenty of work to be done to add proper tests, proper error handling, and proper logging.
 
 ## Installation
 
