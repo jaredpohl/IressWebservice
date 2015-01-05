@@ -2,6 +2,7 @@ require 'yaml'
 require 'spec_helper'
 require 'Date'
 require 'active_support/core_ext'
+
 describe IressWebservice do	
 	CONFIG = YAML.load_file("config.yml") unless defined? CONFIG
 	
@@ -22,7 +23,7 @@ describe IressWebservice do
 	#TEST IRESS CONNECTIONS
 
 	it "should have a variable named @ips which is a Savon::Client object" do
-		@iress.ips_connection?.should be_an_instance_of Savon::Client 		
+		@iress.ips.should be_an_instance_of Savon::Client 		
 	end
 
 	it "should be able to start an iress session and return a result" do
@@ -35,7 +36,7 @@ describe IressWebservice do
 	end
 
 	#TEST IRESS METHODS
-	it "security_time_series returns array" do
+	it "The security_time_series method returns an array" do
 		#need to put in the different ticker and frequencies
 		@iress.security_time_series("BHP", "daily", Date.today.months_ago(1).end_of_month, Date.today).should be_kind_of Array
 	end
@@ -48,7 +49,7 @@ describe IressWebservice do
 	#TEST IPS CONNECTIONS
 
 	it "should have a variable named @iress which is a Savon::Client object" do
-		@iress.iress_connection?.should be_an_instance_of Savon::Client 		
+		@iress.iress.should be_an_instance_of Savon::Client 		
 	end
 
 	it "should be able to start an ips session and return a result" do

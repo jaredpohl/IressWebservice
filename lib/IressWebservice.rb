@@ -1,12 +1,16 @@
 require 'Savon'
 require 'win32ole'
 class IressWebservice
+
+	attr_reader :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :ips, :iress 
+	attr_writer :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :server 
+	
 	def initialize(user_name, company_name, password, server, master_password)
 	 	#set instance variables
 	 	@user_name = user_name
 	 	@company_name = company_name
-	 	@password = password
-	 	@master_password = master_password
+	 	@password = password #iress password
+	 	@master_password = master_password #ios master password
 	 	@server = server
 	 	@iress_session_key = ""
 	 	@ips_session_key = ""
@@ -22,14 +26,7 @@ class IressWebservice
 		@wsh = WIN32OLE.new('Wscript.Shell')
 	end
 
-	def ips_connection?
-		return @ips
-	end
-
-	def iress_connection?
-		return @iress
-	end
-
+	#IRESS DESKTOP APPLICATION METHODS
 	def is_iress_open?
 		if @wsh.AppActivate('IRESS')
 			return true
@@ -65,6 +62,7 @@ class IressWebservice
 			return false
 		end
 	end
+
 	def enter_iress_master_pass
 		# Create an instance of the Wscript Shell:
 		if @wsh.AppActivate('IOS Master Login') 
@@ -125,24 +123,16 @@ class IressWebservice
 		return response.body[:iress_session_start_response][:output][:result]
 	end
 
-	def iress_session_key?
-		#returns the iress session key that is used in any request for the iress webservice.
-		return @iress_session_key
-	end
-
 	def security_time_series(security_code, request_frequency, from_date, to_date)
 		#calls the time_series_get method
 
 		#request_frequency : "daily", "monthly", "yearly"
 		param_hash = {SecurityCode: security_code, Exchange: nil, DataSource: nil, Frequency: request_frequency, TimeSeriesFromDate: from_date, TimeSeriesToDate: to_date}
 		#
-		response = @iress.call(:time_series_get, message: form_iress_xml_request(@iress_session_key, param_hash ))
+		response = @iress.call(:time_series_get, message: form_iress_xml_request(@iress_session_key, param_hash))
 		#returns back an array of hashes based on the iress_time_series_get method. Keys are OpenPrice HighPrice LowPrice ClosePrice TotalVolume TotalValue TradeCount AdjustmentFactor TimeSeriesDate
 		return response.body[:time_series_get_response][:output][:result][:data_rows][:data_row]
 	end
-
-
-
 
 	#IPS WEBSERVICE METHODS
 	def form_ips_xml_request(session_key="",param_hash)
@@ -166,8 +156,7 @@ class IressWebservice
 	end
 
 	def ips_session_start
-		#Invoke ServiceSessionStarton ips service and return sessioni key
-
+		#Invoke ServiceSessionStart on ips service and return session key
 		response = @ips.call(:service_session_start, message: form_ips_xml_request({IRESSSessionKey: @iress_session_key, Service: "IPS", Server: @server})) 
 		#set the session key 
 		@ips_session_key = response.body[:service_session_start_response][:output][:result][:data_rows][:data_row][:service_session_key]
@@ -175,17 +164,12 @@ class IressWebservice
 		return response.body[:service_session_start_response][:output][:result]
 	end
 
-
 	def ips_operations?
 		@ips.operations 
 	end
 
 	def iress_operations?
 		@iress.operations
-	end
-
-	def ips_session_key?
-		return @ips_session_key
 	end
 
 	def accounts_in_group(group_code)
@@ -249,16 +233,13 @@ class IressWebservice
 	end
 
 	def sum_acct_cash_transactions(account_code, from_date, to_date, security_code="CASH")
-		
+
 		transaction_array = ips_account_cash_transactions(account_code, from_date, to_date, security_code="CASH")
-
 		#sums the cash transactions for an account returned from <>.  returns a total of cash transaction values.
-
 		return 0.0 if transaction_array.nil? 
-
 		#iress transaction types
 		transaction_types = ["DJ", "AE", "RE", "DI", "FR", "RI", "RW", "AD", "MA", "RR"]
-		
+	
 		if transaction_array.is_a? (Hash) then
 			#if there is only one transaction, ie a hash is returned sum as follows:
 			total_cash_flow = 0
@@ -278,9 +259,7 @@ class IressWebservice
 			end
 			return total_cash_flow #.to_f
 		end
-
 	end
-
 
 	def ips_get_portfolio_irrs(account_code, from_date, to_date)
 	  #if the date range is greater than 1 month, it breaks returns into monthly increments.
@@ -310,7 +289,6 @@ class IressWebservice
 		#end error check
 
 		#NEED TO ENSURE THAT AN ARRAY IS PASSED BACK IF ITS A HASH
-
 		return result.body[:ips_profit_analysis_twrr_get_by_account1_response][:output][:result][:data_rows][:data_row]#[:account_twrr]
 	end	
 
