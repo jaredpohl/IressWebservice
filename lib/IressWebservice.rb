@@ -1,8 +1,8 @@
 require 'Savon'
 require 'win32ole'
 
+#IRESS DESKTOP APPLICATION METHODS TO ENTER PASSWORD IF USING THE WINDOWS DESKTOP WEBSERVICES
 module Desktop
-#IRESS DESKTOP APPLICATION METHODS
 	def setupDesktop (wsh)
 		@wsh = wsh
 	end
@@ -74,12 +74,16 @@ module Desktop
 	end
 end
 
+#IRESS WEB SERVICES WRAPPER
+
 class IressWebservice
 
+	#set getters and setters
 	attr_reader :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :ips, :iress 
 	attr_writer :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :server 
 	
-	extend IressDesktopControll
+	#mixin the desktop module
+	include Desktop
 
 	def initialize(user_name, company_name, password, server, master_password)
 	 	#set instance variables
@@ -98,7 +102,7 @@ class IressWebservice
 	  @iress = Savon.client(wsdl: @iress_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
 	  @ips = Savon.client(wsdl: @ips_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
 		
-		#shell object
+		#set up the connection to the desktop webservice.. maybe push into the apps that use this library if need
 		setupDesktop(WIN32OLE.new('Wscript.Shell'))
 	end
 
@@ -312,10 +316,11 @@ class IressWebservice
 	end
 
 	def ips_get_position(to_date, account_code)
+		#set params
 		param_hash = {AccountCode: account_code, Date: to_date, ShowFilter:0, PreviousClose: 0, HideClosedPositions: 1, Proposed: 0, ExcludeFromReportFilter: 1}
-
+		#invoke soap request
 		result = @ips.call(:ips_basic_position_get_by_account1, message: form_ips_xml_request(@ips_session_key,param_hash))
-
+		#return position data
 		return result.body[:ips_basic_position_get_by_account1_response][:output][:result][:data_rows][:data_row] 
 	end
 end
