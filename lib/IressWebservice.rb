@@ -166,12 +166,11 @@ class IressWebservice
 	end
 
 	def ips_session_start
-		#Invoke ServiceSessionStarton ips service and return sessioni key
-
+		#Invoke ServiceSessionStarton ips service 
 		response = @ips.call(:service_session_start, message: form_ips_xml_request({IRESSSessionKey: @iress_session_key, Service: "IPS", Server: @server})) 
 		#set the session key 
 		@ips_session_key = response.body[:service_session_start_response][:output][:result][:data_rows][:data_row][:service_session_key]
-		#return the session key
+		#return the result of the soap request
 		return response.body[:service_session_start_response][:output][:result]
 	end
 
