@@ -1,33 +1,10 @@
 require 'Savon'
 require 'win32ole'
-class IressWebservice
-	def initialize(user_name, company_name, password, server, master_password)
-	 	#set instance variables
-	 	@user_name = user_name
-	 	@company_name = company_name
-	 	@password = password
-	 	@master_password = master_password
-	 	@server = server
-	 	@iress_session_key = ""
-	 	@ips_session_key = ""
-	 	@iress_wsdl = "http://127.0.0.1:51234/wsdl.aspx?un=#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
-	 	@ips_wsdl = "http://127.0.0.1:51234/wsdl.aspx?un=#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
-	  #wasnt sure whether to make two different classes here, one for Iress one for IPS.. perhaps next iteration.
-	  
-	  #web service objects
-	  @iress = Savon.client(wsdl: @iress_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
-	  @ips = Savon.client(wsdl: @ips_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
-		
-		#shell object
-		@wsh = WIN32OLE.new('Wscript.Shell')
-	end
 
-	def ips_connection?
-		return @ips
-	end
-
-	def iress_connection?
-		return @iress
+#IRESS DESKTOP APPLICATION METHODS TO ENTER PASSWORD IF USING THE WINDOWS DESKTOP WEBSERVICES
+module Desktop
+	def setupDesktop (wsh)
+		@wsh = wsh
 	end
 
 	def is_iress_open?
@@ -65,6 +42,7 @@ class IressWebservice
 			return false
 		end
 	end
+
 	def enter_iress_master_pass
 		# Create an instance of the Wscript Shell:
 		if @wsh.AppActivate('IOS Master Login') 
@@ -94,7 +72,41 @@ class IressWebservice
 			return false
 		end	
 	end
+end
 
+#IRESS WEB SERVICES WRAPPER
+
+class IressWebservice
+
+	#set getters and setters
+	attr_reader :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :ips, :iress 
+	attr_writer :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :server 
+	
+	#mixin the desktop module
+	include Desktop
+
+	def initialize(user_name, company_name, password, server, master_password)
+	 	#set instance variables
+	 	@user_name = user_name
+	 	@company_name = company_name
+	 	@password = password #iress password
+	 	@master_password = master_password #ios master password
+	 	@server = server
+	 	@iress_session_key = ""
+	 	@ips_session_key = ""
+	 	@iress_wsdl = "http://127.0.0.1:51234/wsdl.aspx?un=#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
+	 	@ips_wsdl = "http://127.0.0.1:51234/wsdl.aspx?un=#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
+	  #wasnt sure whether to make two different classes here, one for Iress one for IPS.. perhaps next iteration.
+	  
+	  #web service objects
+	  @iress = Savon.client(wsdl: @iress_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
+	  @ips = Savon.client(wsdl: @ips_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
+		
+		#set up the connection to the desktop webservice.. maybe push into the apps that use this library if need
+		setupDesktop(WIN32OLE.new('Wscript.Shell'))
+	end
+
+	
 	#IRESS WEBSERVICE METHODS
 	def form_iress_xml_request(session_key="",param_hash)
 		iress_hash = {
@@ -125,9 +137,16 @@ class IressWebservice
 		return response.body[:iress_session_start_response][:output][:result]
 	end
 
-	def iress_session_key?
-		#returns the iress session key that is used in any request for the iress webservice.
-		return @iress_session_key
+	def get_security_info (ticker)
+		#TAKES AN ARRAY OF TICKERS AND PASSES BACK THEIR SECURITY INFORMATION.
+			response = @iress.call(:security_information_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: nil} ))
+			return response.body[:security_information_get_response][:output][:result]
+	end
+
+	def get_pricing_quote (ticker)
+		#TAKES AN ARRAY OF TICKERS AND PASSES BACK THEIR PRICE INFORMATION.
+			response = @iress.call(:pricing_quote_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: nil, DataSource:nil} ))
+			return response.body[:pricing_quote_get_response][:output][:result]
 	end
 
 	def security_time_series(security_code, request_frequency, from_date, to_date)
@@ -136,13 +155,11 @@ class IressWebservice
 		#request_frequency : "daily", "monthly", "yearly"
 		param_hash = {SecurityCode: security_code, Exchange: nil, DataSource: nil, Frequency: request_frequency, TimeSeriesFromDate: from_date, TimeSeriesToDate: to_date}
 		#
-		response = @iress.call(:time_series_get, message: form_iress_xml_request(@iress_session_key, param_hash ))
+		response = @iress.call(:time_series_get, message: form_iress_xml_request(@iress_session_key, param_hash))
+		
 		#returns back an array of hashes based on the iress_time_series_get method. Keys are OpenPrice HighPrice LowPrice ClosePrice TotalVolume TotalValue TradeCount AdjustmentFactor TimeSeriesDate
 		return response.body[:time_series_get_response][:output][:result][:data_rows][:data_row]
 	end
-
-
-
 
 	#IPS WEBSERVICE METHODS
 	def form_ips_xml_request(session_key="",param_hash)
@@ -166,7 +183,8 @@ class IressWebservice
 	end
 
 	def ips_session_start
-		#Invoke ServiceSessionStarton ips service 
+
+		#Invoke ServiceSessionStart on ips service and return session key
 		response = @ips.call(:service_session_start, message: form_ips_xml_request({IRESSSessionKey: @iress_session_key, Service: "IPS", Server: @server})) 
 		#set the session key 
 		@ips_session_key = response.body[:service_session_start_response][:output][:result][:data_rows][:data_row][:service_session_key]
@@ -174,17 +192,12 @@ class IressWebservice
 		return response.body[:service_session_start_response][:output][:result]
 	end
 
-
 	def ips_operations?
 		@ips.operations 
 	end
 
 	def iress_operations?
 		@iress.operations
-	end
-
-	def ips_session_key?
-		return @ips_session_key
 	end
 
 	def accounts_in_group(group_code)
@@ -248,16 +261,13 @@ class IressWebservice
 	end
 
 	def sum_acct_cash_transactions(account_code, from_date, to_date, security_code="CASH")
-		
+
 		transaction_array = ips_account_cash_transactions(account_code, from_date, to_date, security_code="CASH")
-
 		#sums the cash transactions for an account returned from <>.  returns a total of cash transaction values.
-
 		return 0.0 if transaction_array.nil? 
-
 		#iress transaction types
 		transaction_types = ["DJ", "AE", "RE", "DI", "FR", "RI", "RW", "AD", "MA", "RR"]
-		
+	
 		if transaction_array.is_a? (Hash) then
 			#if there is only one transaction, ie a hash is returned sum as follows:
 			total_cash_flow = 0
@@ -277,11 +287,9 @@ class IressWebservice
 			end
 			return total_cash_flow #.to_f
 		end
-
 	end
 
-
-	def ips_get_portfolio_irrs(account_code, from_date, to_date)
+	def ips_get_portfolio_irr_request(account_code, from_date, to_date)
 	  #if the date range is greater than 1 month, it breaks returns into monthly increments.
 	  #returns an array of 1m returns with their corresponding benchmark returns and the as at date for both
 	  param_hash = {
@@ -304,24 +312,17 @@ class IressWebservice
     	UseExposure: 1
     }
 
-    #error check here
 		result = @ips.call(:ips_profit_analysis_twrr_get_by_account1, message: form_ips_xml_request(@ips_session_key, param_hash))
-		#end error check
-
-		#NEED TO ENSURE THAT AN ARRAY IS PASSED BACK IF ITS A HASH
-
 		return result.body[:ips_profit_analysis_twrr_get_by_account1_response][:output][:result][:data_rows][:data_row]#[:account_twrr]
 	end	
 
 	def ips_get_portfolio_irr(account_code, from_date, to_date)
-		#REMOVE HASH CHECK
-
 		#ips_get_portfolio_irrs will return a hash if the length of time is less
-		if ips_get_portfolio_irrs(account_code, from_date, to_date).is_a? Hash 
-			return ips_get_portfolio_irrs(account_code, from_date, to_date)[:account_twrr]
+		if ips_get_portfolio_irr_request(account_code, from_date, to_date).is_a? Hash 
+			return ips_get_portfolio_irr_request(account_code, from_date, to_date)[:account_twrr]
 		else
 			total_return = 0
-			ips_get_portfolio_irrs(account_code, from_date, to_date).each do |row|
+			ips_get_portfolio_irr_request(account_code, from_date, to_date).each do |row|
 				total_return = total_return + row[:account_twrr]
 			end
 			return total_return
@@ -329,10 +330,11 @@ class IressWebservice
 	end
 
 	def ips_get_position(to_date, account_code)
+		#set params
 		param_hash = {AccountCode: account_code, Date: to_date, ShowFilter:0, PreviousClose: 0, HideClosedPositions: 1, Proposed: 0, ExcludeFromReportFilter: 1}
-
+		#invoke soap request
 		result = @ips.call(:ips_basic_position_get_by_account1, message: form_ips_xml_request(@ips_session_key,param_hash))
-
+		#return position data
 		return result.body[:ips_basic_position_get_by_account1_response][:output][:result][:data_rows][:data_row] 
 	end
 end
