@@ -137,12 +137,16 @@ class IressWebservice
 		return response.body[:iress_session_start_response][:output][:result]
 	end
 
-	def get_security_info ()
-
+	def get_security_info (ticker)
+		#TAKES AN ARRAY OF TICKERS AND PASSES BACK THEIR SECURITY INFORMATION.
+			response = @iress.call(:security_information_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: nil} ))
+			return response.body[:security_information_get_response][:output][:result]
 	end
 
-	def get_pricing_quote ()
-
+	def get_pricing_quote (ticker)
+		#TAKES AN ARRAY OF TICKERS AND PASSES BACK THEIR PRICE INFORMATION.
+			response = @iress.call(:pricing_quote_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: nil, DataSource:nil} ))
+			return response.body[:pricing_quote_get_response][:output][:result]
 	end
 
 	def security_time_series(security_code, request_frequency, from_date, to_date)
@@ -152,6 +156,7 @@ class IressWebservice
 		param_hash = {SecurityCode: security_code, Exchange: nil, DataSource: nil, Frequency: request_frequency, TimeSeriesFromDate: from_date, TimeSeriesToDate: to_date}
 		#
 		response = @iress.call(:time_series_get, message: form_iress_xml_request(@iress_session_key, param_hash))
+		
 		#returns back an array of hashes based on the iress_time_series_get method. Keys are OpenPrice HighPrice LowPrice ClosePrice TotalVolume TotalValue TradeCount AdjustmentFactor TimeSeriesDate
 		return response.body[:time_series_get_response][:output][:result][:data_rows][:data_row]
 	end
