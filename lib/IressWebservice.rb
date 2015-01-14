@@ -137,6 +137,14 @@ class IressWebservice
 		return response.body[:iress_session_start_response][:output][:result]
 	end
 
+	def get_security_info ()
+
+	end
+
+	def get_pricing_quote ()
+
+	end
+
 	def security_time_series(security_code, request_frequency, from_date, to_date)
 		#calls the time_series_get method
 
