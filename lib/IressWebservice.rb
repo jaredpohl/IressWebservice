@@ -337,5 +337,14 @@ class IressWebservice
 		#return position data
 		return result.body[:ips_basic_position_get_by_account1_response][:output][:result][:data_rows][:data_row] 
 	end
+
+	def ips_get_group_position(to_date, group_code, group_by='Position')
+		#set params
+		param_hash = {GroupCode: group_code, Date: to_date, GroupBy: group_by } #PricingType: 0, CostType: 0, PortfolioCode: 0, Settled: 1}
+		#invoke soap request
+		result = @ips.call(:ips_position_ex_get_by_group1, message: form_ips_xml_request(@ips_session_key,param_hash))
+		#return position data
+		return result.body[:ips_position_ex_get_by_group1_response][:output][:result][:data_rows][:data_row] 
+	end
 end
 
