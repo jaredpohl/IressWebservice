@@ -85,7 +85,7 @@ class IressWebservice
 	#mixin the desktop module
 	include Desktop
 
-	def initialize(user_name, company_name, password, server, master_password)
+	def initialize(user_name, company_name, password, server, master_password, iress_wsdl='http://127.0.0.1:51234/wsdl.aspx?un=', ips_wsdl='http://127.0.0.1:51234/wsdl.aspx?un=')
 	 	#set instance variables
 	 	@user_name = user_name
 	 	@company_name = company_name
@@ -94,10 +94,9 @@ class IressWebservice
 	 	@server = server
 	 	@iress_session_key = ""
 	 	@ips_session_key = ""
-	 	@iress_wsdl = "http://127.0.0.1:51234/wsdl.aspx?un=#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
-	 	@ips_wsdl = "http://127.0.0.1:51234/wsdl.aspx?un=#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
-	  #wasnt sure whether to make two different classes here, one for Iress one for IPS.. perhaps next iteration.
-	  
+	 	@iress_wsdl = "#{iress_wsdl}#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
+	 	@ips_wsdl = "#{ips_wsdl}#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
+
 	  #web service objects
 	  @iress = Savon.client(wsdl: @iress_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
 	  @ips = Savon.client(wsdl: @ips_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
@@ -137,9 +136,9 @@ class IressWebservice
 		return response.body[:iress_session_start_response][:output][:result]
 	end
 
-	def get_security_info (ticker)
+	def get_security_info (ticker, exchange=nil)
 		#TAKES AN ARRAY OF TICKERS AND PASSES BACK THEIR SECURITY INFORMATION.
-			response = @iress.call(:security_information_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: nil} ))
+			response = @iress.call(:security_information_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: exchange} ))
 			return response.body[:security_information_get_response][:output][:result]
 	end
 
@@ -329,22 +328,65 @@ class IressWebservice
 		end
 	end
 
-	def ips_get_position(to_date, account_code)
+	def ips_get_position_old(to_date, account_code)
 		#set params
-		param_hash = {AccountCode: account_code, Date: to_date, ShowFilter:0, PreviousClose: 0, HideClosedPositions: 1, Proposed: 0, ExcludeFromReportFilter: 1}
+		param_hash = {AccountCode: account_code, Date: to_date, ShowFilter:0, PreviousClose: 0, HideClosedPositions: 1, Proposed: true, ExcludeFromReportFilter: 1}
 		#invoke soap request
 		result = @ips.call(:ips_basic_position_get_by_account1, message: form_ips_xml_request(@ips_session_key,param_hash))
 		#return position data
 		return result.body[:ips_basic_position_get_by_account1_response][:output][:result][:data_rows][:data_row] 
 	end
 
-	def ips_get_group_position(to_date, group_code, group_by='Position')
+
+	def ips_get_position(to_date, account_code, group_by='Position', settled=true, proposed=false)
 		#set params
-		param_hash = {GroupCode: group_code, Date: to_date, GroupBy: group_by } #PricingType: 0, CostType: 0, PortfolioCode: 0, Settled: 1}
+		param_hash = {
+			AccountCode: account_code, 
+			Date: to_date, 
+			GroupBy: group_by, 
+			Settled: settled,
+			Proposed: proposed }
+		
+		#invoke soap request
+		result = @ips.call(:ips_position_ex_get_by_account1, message: form_ips_xml_request(@ips_session_key,param_hash))
+		#return position data
+		return result.body[:ips_position_ex_get_by_account1_response][:output][:result][:data_rows][:data_row] 
+	end
+
+	def ips_get_group_position(to_date, group_code, group_by='Position', settled=true, proposed=false)
+		#set params
+		param_hash = {GroupCode: group_code, Date: to_date, GroupBy: group_by, Settled: settled, Proposed: proposed}
 		#invoke soap request
 		result = @ips.call(:ips_position_ex_get_by_group1, message: form_ips_xml_request(@ips_session_key,param_hash))
-		#return position data
-		return result.body[:ips_position_ex_get_by_group1_response][:output][:result][:data_rows][:data_row] 
+		#position data
+		result.body[:ips_position_ex_get_by_group1_response][:output][:result][:data_rows][:data_row] 
 	end
+
+	#need to get these working
+
+	def iress_session_end()
+		result = @iress.call(:iress_session_end, message: {})
+		puts result
+		return result
+	end
+
+	def service_session_end()
+		result = @ips.call(:service_session_end, message: {})
+		puts result
+		return result
+	end
+
+	def disconnect()
+		self.service_session_end
+		self.iress_session_end
+	end
+
+	def return_result(response)
+		return response[:output][:result][:data_rows][:data_row] 
+	end
+	def return_input(response)
+		return response[:output][:input]
+	end
+
 end
 
