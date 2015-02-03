@@ -102,8 +102,8 @@ class IressWebservice
 	 	@iress_session_key = ""
 	 	@ips_session_key = ""
 	 	@endpoint = endpoint
-	 	@iress_wsdl = "?#{iress_wsdl}un=#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
-	 	@ips_wsdl = "?#{ips_wsdl}un=#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
+	 	@iress_wsdl = "#{iress_wsdl}?un=#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
+	 	@ips_wsdl = "#{ips_wsdl}?un=#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
 	 	@debug = false
 	  	#web service objects
 	  	@iress = Savon.client(wsdl: @iress_wsdl, endpoint: @endpoint, namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
