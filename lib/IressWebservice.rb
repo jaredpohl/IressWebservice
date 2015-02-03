@@ -1,10 +1,10 @@
 require 'Savon'
-require 'win32ole'
+#require 'win32ole'
 
 #IRESS DESKTOP APPLICATION METHODS TO ENTER PASSWORD IF USING THE WINDOWS DESKTOP WEBSERVICES
 module Desktop
-	def setupDesktop (wsh)
-		@wsh = wsh
+	def setupDesktop ()
+		@wsh = WIN32OLE.new('Wscript.Shell')
 	end
 
 	def is_iress_open?
@@ -74,18 +74,25 @@ module Desktop
 	end
 end
 
+module Kernel
+   private
+   def this_method
+     __method__
+   end
+end
+
 #IRESS WEB SERVICES WRAPPER
 
 class IressWebservice
 
 	#set getters and setters
-	attr_reader :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :ips, :iress 
-	attr_writer :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :server 
+	attr_reader :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :ips, :iress, :endpoint, :debug
+	attr_writer :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :server, :endpoint, :debug
 	
 	#mixin the desktop module
-	include Desktop
+	#include Desktop
 
-	def initialize(user_name, company_name, password, server, master_password, iress_wsdl='http://127.0.0.1:51234/wsdl.aspx?un=', ips_wsdl='http://127.0.0.1:51234/wsdl.aspx?un=')
+	def initialize(user_name, company_name, password, server, master_password='', iress_wsdl='https://betawebservices.iress.com.au/v4/wsdl.aspx', ips_wsdl='https://betawebservices.iress.com.au/v4/wsdl.aspx', endpoint='https://betawebservices.iress.com.au/v4/soap.aspx')
 	 	#set instance variables
 	 	@user_name = user_name
 	 	@company_name = company_name
@@ -94,18 +101,15 @@ class IressWebservice
 	 	@server = server
 	 	@iress_session_key = ""
 	 	@ips_session_key = ""
-	 	@iress_wsdl = "#{iress_wsdl}#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
-	 	@ips_wsdl = "#{ips_wsdl}#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
-
-	  #web service objects
-	  @iress = Savon.client(wsdl: @iress_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
-	  @ips = Savon.client(wsdl: @ips_wsdl, endpoint: "http://127.0.0.1:51234/soap.aspx", namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
-		
-		#set up the connection to the desktop webservice.. maybe push into the apps that use this library if need
-		setupDesktop(WIN32OLE.new('Wscript.Shell'))
+	 	@endpoint = endpoint
+	 	@iress_wsdl = "?#{iress_wsdl}un=#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
+	 	@ips_wsdl = "?#{ips_wsdl}un=#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
+	 	@debug = false
+	  	#web service objects
+	  	@iress = Savon.client(wsdl: @iress_wsdl, endpoint: @endpoint, namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
+	  	@ips = Savon.client(wsdl: @ips_wsdl, endpoint: @endpoint, namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
 	end
 
-	
 	#IRESS WEBSERVICE METHODS
 	def form_iress_xml_request(session_key="",param_hash)
 		iress_hash = {
@@ -132,20 +136,37 @@ class IressWebservice
 		response = @iress.call(:iress_session_start, message: form_iress_xml_request({UserName: @user_name, CompanyName: @company_name, Password: @password, ApplicationID: "",ApplicationLabel: "",PreviousSessionKey: "",SessionTimeout: "",AuthenticationType: "",SessionNumberToKick: "",KickLikeSessions: ""})) 
 		#set the session key in the object
 		@iress_session_key = response.to_hash[:iress_session_start_response][:output][:result][:data_rows][:data_row][:iress_session_key]
+		
+		#display debug info
+		puts "#{DateTime.now} - #{this_method}:" if @debug
+		puts "#{response.body[:iress_session_start_response][:output][:result]}" if @debug
+		
 		#return the result from the query
 		return response.body[:iress_session_start_response][:output][:result]
 	end
 
 	def get_security_info (ticker, exchange=nil)
 		#TAKES AN ARRAY OF TICKERS AND PASSES BACK THEIR SECURITY INFORMATION.
-			response = @iress.call(:security_information_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: exchange} ))
-			return response.body[:security_information_get_response][:output][:result]
+		response = @iress.call(:security_information_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: exchange} ))
+		
+		#display debug info
+		puts "#{DateTime.now} - #{this_method}:" if @debug
+		puts "#{response.body[:security_information_get_response][:output][:result]}" if @debug
+
+		#return
+		return response.body[:security_information_get_response][:output][:result]
 	end
 
 	def get_pricing_quote (ticker)
 		#TAKES AN ARRAY OF TICKERS AND PASSES BACK THEIR PRICE INFORMATION.
-			response = @iress.call(:pricing_quote_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: nil, DataSource:nil} ))
-			return response.body[:pricing_quote_get_response][:output][:result]
+		response = @iress.call(:pricing_quote_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: nil, DataSource:nil} ))
+		
+		#display debug info
+		puts "#{DateTime.now} - #{this_method}:" if @debug
+		puts "#{response.body[:pricing_quote_get_response][:output][:result]}" if @debug
+
+		#return
+		return response.body[:pricing_quote_get_response][:output][:result]
 	end
 
 	def security_time_series(security_code, request_frequency, from_date, to_date)
@@ -153,9 +174,12 @@ class IressWebservice
 
 		#request_frequency : "daily", "monthly", "yearly"
 		param_hash = {SecurityCode: security_code, Exchange: nil, DataSource: nil, Frequency: request_frequency, TimeSeriesFromDate: from_date, TimeSeriesToDate: to_date}
-		#
 		response = @iress.call(:time_series_get, message: form_iress_xml_request(@iress_session_key, param_hash))
 		
+		#display debug info
+		puts "#{DateTime.now} - #{this_method}:" if @debug
+		puts "#{response.body[:time_series_get_response][:output][:result][:data_rows][:data_row]}" if @debug
+
 		#returns back an array of hashes based on the iress_time_series_get method. Keys are OpenPrice HighPrice LowPrice ClosePrice TotalVolume TotalValue TradeCount AdjustmentFactor TimeSeriesDate
 		return response.body[:time_series_get_response][:output][:result][:data_rows][:data_row]
 	end
