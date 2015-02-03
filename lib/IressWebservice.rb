@@ -1,85 +1,4 @@
 require 'Savon'
-#require 'win32ole'
-
-#IRESS DESKTOP APPLICATION METHODS TO ENTER PASSWORD IF USING THE WINDOWS DESKTOP WEBSERVICES
-module Desktop
-	def setupDesktop ()
-		@wsh = WIN32OLE.new('Wscript.Shell')
-	end
-
-	def is_iress_open?
-		if @wsh.AppActivate('IRESS')
-			return true
-		else
-			return false
-		end
-	end
-
-	def open_iress
-		#open Iress
-		system("start Iress.exe")
-		sleep(5)
-	end
-
-	def enter_iress_login_details
-		if @wsh.AppActivate('Login Details')
-			sleep(2)
-			#log in
-			key_string = "#{@user_name}{TAB}"
-			@wsh.SendKeys(key_string)
-			#organisation code
-			key_string = "#{@company_name}{TAB}"
-			@wsh.SendKeys(key_string)
-			#password
-			key_string = "#{@password}{TAB}"
-			@wsh.SendKeys(key_string)
-			#enter
-			@wsh.SendKeys("{ENTER}")
-			sleep(5)
-			return true
-		else
-			puts "IressWebservice: cannot locate 'Login Details' window."
-			return false
-		end
-	end
-
-	def enter_iress_master_pass
-		# Create an instance of the Wscript Shell:
-		if @wsh.AppActivate('IOS Master Login') 
-		  sleep(2) 
-		  #enter master password  
-		  key_string = "#{@master_password}{ENTER}" 
-		  @wsh.SendKeys(key_string)
-		  sleep(5)
-		  return true
-		else
-			puts "IressWebservice: cannot locate 'IOS Master Login' window."
-			return false
-		end
-	end
-
-	def close_iress
-		#if shell can make iress visible
-		if @wsh.AppActivate('IRESS')
-			#CLOSE APPLICATION
-			@wsh.SendKeys('%{F4}')
-			sleep(2)
-			#CONFIRM CLOSE
-			@wsh.SendKeys('{ENTER}')
-			return true
-		else
-			puts "IressWebservice: cannot close iress."
-			return false
-		end	
-	end
-end
-
-module Kernel
-   private
-   def this_method
-     __method__
-   end
-end
 
 #IRESS WEB SERVICES WRAPPER
 
@@ -89,25 +8,27 @@ class IressWebservice
 	attr_reader :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :ips, :iress, :endpoint, :debug
 	attr_writer :iress_session_key, :ips_session_key, :iress_wsdl, :ips_wsdl, :server, :endpoint, :debug
 	
-	#mixin the desktop module
-	#include Desktop
 
-	def initialize(user_name, company_name, password, server, master_password='', iress_wsdl='https://betawebservices.iress.com.au/v4/wsdl.aspx', ips_wsdl='https://betawebservices.iress.com.au/v4/wsdl.aspx', endpoint='https://betawebservices.iress.com.au/v4/soap.aspx')
+	def initialize(user_name, company_name, password, server, iress_wsdl='https://betawebservices.iress.com.au/v4/wsdl.aspx', ips_wsdl='https://betawebservices.iress.com.au/v4/wsdl.aspx', endpoint='https://betawebservices.iress.com.au/v4/soap.aspx')
 	 	#set instance variables
 	 	@user_name = user_name
 	 	@company_name = company_name
 	 	@password = password #iress password
-	 	@master_password = master_password #ios master password
-	 	@server = server
+
 	 	@iress_session_key = ""
 	 	@ips_session_key = ""
+
+	 	@server = server #the ips server name, used for the ips service
+
 	 	@endpoint = endpoint
 	 	@iress_wsdl = "#{iress_wsdl}?un=#{@user_name}&cp=#{@company_name}&svc=IRESS&svr=&pw=#{@password}"
 	 	@ips_wsdl = "#{ips_wsdl}?un=#{@user_name}&cp=#{@company_name}&svc=IPS&svr=#{@server}&pw=#{@password}"
+	 	
 	 	@debug = false
 	  	#web service objects
 	  	@iress = Savon.client(wsdl: @iress_wsdl, endpoint: @endpoint, namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
 	  	@ips = Savon.client(wsdl: @ips_wsdl, endpoint: @endpoint, namespace: "http://webservices.iress.com.au/v4/", namespace_identifier: :v4, env_namespace: :soapenv, convert_request_keys_to: :camelcase,	log: false)
+	
 	end
 
 	#IRESS WEBSERVICE METHODS
@@ -138,7 +59,7 @@ class IressWebservice
 		@iress_session_key = response.to_hash[:iress_session_start_response][:output][:result][:data_rows][:data_row][:iress_session_key]
 		
 		#display debug info
-		puts "#{DateTime.now} - #{this_method}:" if @debug
+		puts "#{DateTime.now} - iress_session_start:" if @debug
 		puts "#{response.body[:iress_session_start_response][:output][:result]}" if @debug
 		
 		#return the result from the query
@@ -150,7 +71,7 @@ class IressWebservice
 		response = @iress.call(:security_information_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: exchange} ))
 		
 		#display debug info
-		puts "#{DateTime.now} - #{this_method}:" if @debug
+		puts "#{DateTime.now} - security_information_get:" if @debug
 		puts "#{response.body[:security_information_get_response][:output][:result]}" if @debug
 
 		#return
@@ -162,7 +83,7 @@ class IressWebservice
 		response = @iress.call(:pricing_quote_get, message: form_iress_xml_request(@iress_session_key, {SecurityCode: ticker , Exchange: nil, DataSource:nil} ))
 		
 		#display debug info
-		puts "#{DateTime.now} - #{this_method}:" if @debug
+		puts "#{DateTime.now} - pricing_quote_get:" if @debug
 		puts "#{response.body[:pricing_quote_get_response][:output][:result]}" if @debug
 
 		#return
@@ -177,7 +98,7 @@ class IressWebservice
 		response = @iress.call(:time_series_get, message: form_iress_xml_request(@iress_session_key, param_hash))
 		
 		#display debug info
-		puts "#{DateTime.now} - #{this_method}:" if @debug
+		puts "#{DateTime.now} - time_series_get:" if @debug
 		puts "#{response.body[:time_series_get_response][:output][:result][:data_rows][:data_row]}" if @debug
 
 		#returns back an array of hashes based on the iress_time_series_get method. Keys are OpenPrice HighPrice LowPrice ClosePrice TotalVolume TotalValue TradeCount AdjustmentFactor TimeSeriesDate

@@ -1,5 +1,5 @@
 #reconcile.rb
-#require 'rubygems'
+require 'rubygems'
 #require 'savon'
 require_relative 'IressWebservice'
 require 'Date'
@@ -14,7 +14,10 @@ puts iress.debug
 iress.debug= true
 puts iress.debug
 
-#puts client.operations
+iress.iress_session_start
+iress.ips_session_start
+
+iress.ips_operations
 
 puts iress.get_pricing_quote(["BHP","SEK"])
 
