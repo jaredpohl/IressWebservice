@@ -10,6 +10,7 @@ CONFIG['to_date'] = Date.today
 
 #start iress ws sessions
 iress = IressWebservice.new(CONFIG['user_name'], CONFIG['company_name'], CONFIG['password'], CONFIG['server'])
+
 puts iress.debug
 iress.debug= true
 puts iress.debug
